@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tabla de Schulte</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #ffffff;
+      color: #1a1a1a;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      user-select: none;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      color: #6c757d;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .timer-display {
+      font-size: 3.5rem;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .btn-reiniciar {
+      background-color: #1a1a1a;
+      color: #ffffff;
+      border-radius: 8px;
+      padding: 0.55rem 1.25rem;
+      font-weight: 600;
+      border: none;
+    }
+
+    .btn-reiniciar:hover {
+      background-color: #333333;
+      color: #ffffff;
+    }
+
+    .schulte-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 390px;
+      margin: 0 auto;
+    }
+
+    .schulte-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      border-top: 1px solid #d1d5db;
+      border-left: 1px solid #d1d5db;
+    }
+
+    .schulte-cell {
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: #1a1a1a;
+      background-color: #ffffff;
+      border-right: 1px solid #d1d5db;
+      border-bottom: 1px solid #d1d5db;
+      cursor: pointer;
+      transition: background-color 0.08s ease;
+    }
+
+    .schulte-cell:hover {
+      background-color: #f8f9fa;
+    }
+
+    .schulte-cell:active {
+      background-color: #e9ecef;
+    }
+
+    .center-cross {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #9ca3af;
+      font-size: 1.2rem;
+      pointer-events: none;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container py-4 text-center" style="max-width: 540px;">
+    
+    <div class="row mb-4">
+      <div class="col-4">
+        <div class="stat-label">Mejor tiempo</div>
+        <div class="stat-value" id="mejorTiempo">--</div>
+      </div>
+      <div class="col-4">
+        <div class="stat-label">Partidas</div>
+        <div class="stat-value" id="partidas">0</div>
+      </div>
+      <div class="col-4">
+        <div class="stat-label">Siguiente</div>
+        <div class="stat-value" id="siguiente">1</div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
+      <div class="timer-display" id="cronometro">0.00</div>
+      <button class="btn btn-reiniciar" id="btnReiniciar">Reiniciar</button>
+    </div>
+
+    <p class="mb-1 text-secondary">Haz clic en los números del 1 al 25 en orden ascendente</p>
+    <p class="small text-muted mb-4">Errores: <span id="errores">0</span></p>
+
+    <div class="schulte-wrapper mb-4">
+      <div class="schulte-grid" id="tablero"></div>
+      <div class="center-cross">+</div>
+    </div>
+
+  </div>
+
+  <script>
+    const TOTAL_NUMEROS = 25;
+    let numeroSiguiente = 1;
+    let errores = 0;
+    let partidas = parseInt(localStorage.getItem('schulte_partidas')) || 0;
+    let mejorTiempo = parseFloat(localStorage.getItem('schulte_mejor')) || null;
+
+    let tiempoInicio = null;
+    let intervaloTimer = null;
+    let juegoIniciado = false;
+    let juegoTerminado = false;
+
+    const elTablero = document.getElementById('tablero');
+    const elCronometro = document.getElementById('cronometro');
+    const elSiguiente = document.getElementById('siguiente');
+    const elErrores = document.getElementById('errores');
+    const elPartidas = document.getElementById('partidas');
+    const elMejorTiempo = document.getElementById('mejorTiempo');
+
+    elPartidas.textContent = partidas;
+    if (mejorTiempo !== null) {
+      elMejorTiempo.textContent = mejorTiempo.toFixed(2);
+    }
+
+    function generarNumerosAleatorios() {
+      const numeros = Array.from({ length: TOTAL_NUMEROS }, (_, i) => i + 1);
+      for (let i = numeros.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [numeros[i], numeros[j]] = [numeros[j], numeros[i]];
+      }
+      return numeros;
+    }
+
+    function arrancarCronometro() {
+      tiempoInicio = performance.now();
+      intervaloTimer = setInterval(() => {
+        const transcurrido = (performance.now() - tiempoInicio) / 1000;
+        elCronometro.textContent = transcurrido.toFixed(2);
+      }, 10);
+    }
+
+    function finalizarJuego() {
+      clearInterval(intervaloTimer);
+      juegoTerminado = true;
+
+      const tiempoFinal = (performance.now() - tiempoInicio) / 1000;
+      elCronometro.textContent = tiempoFinal.toFixed(2);
+      elSiguiente.textContent = '-';
+
+      partidas++;
+      localStorage.setItem('schulte_partidas', partidas);
+      elPartidas.textContent = partidas;
+
+      if (mejorTiempo === null || tiempoFinal < mejorTiempo) {
+        mejorTiempo = tiempoFinal;
+        localStorage.setItem('schulte_mejor', mejorTiempo);
+        elMejorTiempo.textContent = mejorTiempo.toFixed(2);
+      }
+
+      setTimeout(() => {
+        alert(`¡Tabla completada!\n\nTiempo total: ${tiempoFinal.toFixed(2)} s\nTotal de errores: ${errores}`);
+      }, 50);
+    }
+
+    function manejarClicCelda(numero) {
+      if (juegoTerminado) return;
+
+      if (!juegoIniciado) {
+        juegoIniciado = true;
+        arrancarCronometro();
+      }
+
+      if (numero === numeroSiguiente) {
+        if (numeroSiguiente === TOTAL_NUMEROS) {
+          finalizarJuego();
+        } else {
+          numeroSiguiente++;
+          elSiguiente.textContent = numeroSiguiente;
+        }
+      } else {
+        errores++;
+        elErrores.textContent = errores;
+      }
+    }
+
+    function iniciarJuego() {
+      clearInterval(intervaloTimer);
+      numeroSiguiente = 1;
+      errores = 0;
+      juegoIniciado = false;
+      juegoTerminado = false;
+
+      elCronometro.textContent = '0.00';
+      elSiguiente.textContent = '1';
+      elErrores.textContent = '0';
+      elTablero.innerHTML = '';
+
+      const numeros = generarNumerosAleatorios();
+      numeros.forEach(num => {
+        const celda = document.createElement('div');
+        celda.className = 'schulte-cell';
+        celda.textContent = num;
+        celda.addEventListener('click', () => manejarClicCelda(num));
+        elTablero.appendChild(celda);
+      });
+    }
+
+    document.getElementById('btnReiniciar').addEventListener('click', iniciarJuego);
+
+    iniciarJuego();
+  </script>
+</body>
+</html>
